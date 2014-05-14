@@ -31,6 +31,26 @@ if ( defined( 'WP_CLI' ) && WP_CLI )
  * @package 
  **/
 class Escape_NextGen_Gallery {
+	
+	/**
+	 * Shortcode that will be converted to 
+	 *
+	 * @since   1.0.0
+	 *
+	 * @var     string
+	 */
+	public $shortcode;
+
+
+	/**
+	 * Allowed Shortcodes
+	 *
+	 * @since   1.0.0
+	 *
+	 * @var     string
+	 */
+	public $allowed_shortcode;
+
 
 	/**
 	 * The number of images converted
@@ -85,6 +105,8 @@ class Escape_NextGen_Gallery {
 	public function __construct() {
 		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
 
+		$this->shortcode = 'nggallery';
+		$this->allowed_shortcode = apply_filters( 'escape_ngg_allowed_shortcode', array('nggallery','imagebrowser'));
 		$this->images_count = 0;
 		$this->posts_count = 0;
 		$this->warnings = array();
@@ -111,6 +133,15 @@ class Escape_NextGen_Gallery {
 			$limit = (int) $_GET[ 'escape_ngg_limit' ];
 		}
 
+		if ( isset( $_GET[ 'escape_ngg_shortcode' ] ) ) {
+			$this->shortcode = $_GET[ 'escape_ngg_shortcode' ];
+		}
+
+		if(!in_array($this->shortcode, $this->allowed_shortcode)){
+			printf( '<span style="color: #900;">Invalid shortcode:  %s</span><br />', esc_html( $this->shortcode ) );
+			return;
+		}
+
 		error_reporting( E_ALL );
 		ini_set( 'display_errors', 1 );
 		set_time_limit( 600 );
@@ -122,6 +153,7 @@ class Escape_NextGen_Gallery {
 		}
 
 		$this->infos[] = sprintf( "Updated %d posts and %d images.", $this->posts_count, $this->images_count );
+		
 
 		foreach ( $this->infos as $info )
 			printf( '<span style="color: #090;">%s</span><br />', esc_html( $info ) );
@@ -158,7 +190,7 @@ class Escape_NextGen_Gallery {
 		$post = get_post( $post_id );
 		$matches = null;
 
-		preg_match( '#nggallery id(\s)*="?(\s)*(?P<id>\d+)#i', $post->post_content, $matches );
+		preg_match( '#'.$this->shortcode.' id(\s)*="?(\s)*(?P<id>\d+)#i', $post->post_content, $matches );
 		if ( ! isset( $matches['id'] ) ) {
 			$this->warnings[] = sprintf( "Could not match gallery id in %d", $post->ID );
 			return;
@@ -243,7 +275,7 @@ class Escape_NextGen_Gallery {
 
 		// Booyaga!
 		$pristine_content = $post->post_content;
-		$post->post_content = preg_replace( '#\[nggallery[^\]]*\]#i', $gallery, $post->post_content );
+		$post->post_content = preg_replace( '#\['.$this->shortcode.'[^\]]*\]#i', $gallery, $post->post_content );
 		$post->post_content = apply_filters( 'engg_post_content', $post->post_content, $pristine_content, $attr, $post, $gallery );
 		wp_update_post( $post );
 		$this->posts_count++;
@@ -257,7 +289,7 @@ class Escape_NextGen_Gallery {
 	 **/
 	public function get_post_ids( $limit = -1 ) {
 		$args = array(
-			's'           => '[nggallery',
+			's'           => '['.$this->shortcode,
 			'post_type'   => array( 'post', 'page' ),
 			'post_status' => 'any',
 			'nopaging'    => true,
